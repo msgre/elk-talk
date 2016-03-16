@@ -1,0 +1,4 @@
+REDIS_DATE %{MONTHDAY} %{MONTH} %{TIME}
+REDIS_LOGLEVEL (\.|\-|\*|\#)
+REDIS_ROLE (X|C|S|M)
+REDIS_LOG %{POSINT:pid:int}:%{REDIS_ROLE:role} %{REDIS_DATE:date} %{REDIS_LOGLEVEL:loglevel} %{GREEDYDATA:logmessage}

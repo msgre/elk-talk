@@ -1,0 +1,1 @@
+NGINX %{IPORHOST:remote_addr} %{USER:ident} %{USER:auth} \[%{HTTPDATE:timestamp}\] "(?:%{WORD:method} %{URIPATHPARAM:request}(?: HTTP/%{NUMBER:httpversion})?|-)" %{INT:status} (?:%{INT:bytes:int}|-) "(?:%{URI:referer}|-)" %{QS:user_agent}(?: (?:%{BASE16NUM:device_sn}|-) %{QS:fw_version})?

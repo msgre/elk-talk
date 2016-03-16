@@ -1,0 +1,24 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+
+Vagrant.configure("2") do |config|
+    config.ssh.pty = true
+
+    config.vm.define :docker do |inner_config|
+        inner_config.vm.box = "ubuntu/trusty64"
+
+        # network
+        inner_config.vm.hostname = "elk.vbox"
+        inner_config.vm.network :private_network, ip: "192.168.99.200"
+
+        # shared folders
+        inner_config.vm.synced_folder "./configs", "/configs", id: "core", :nfs => true, :mount_options => ['actimeo=2'], :mount_options => ['nolock,vers=3,udp,noatime']
+
+        # vagrant machine parameters
+        inner_config.vm.provider :virtualbox do |vb|
+            vb.customize ["modifyvm", :id, "--memory", "2048"]
+            vb.name = inner_config.vm.hostname
+        end
+    end
+end

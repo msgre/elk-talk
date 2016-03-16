@@ -1,0 +1,18 @@
+server {
+  server_name _;
+  access_log /var/log/nginx/kibana.log;
+
+  listen 80;
+
+  auth_basic "Restricted";
+  auth_basic_user_file {{ logger_logstash_kibana_authfile }};
+
+  location / {
+      proxy_pass http://localhost:5601;
+      proxy_http_version 1.1;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection 'upgrade';
+      proxy_set_header Host $host;
+      proxy_cache_bypass $http_upgrade;
+  }
+}

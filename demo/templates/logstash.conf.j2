@@ -1,0 +1,16 @@
+input {
+    file {
+        path => "/var/log/syslog"
+        type => "syslog"
+    }
+}
+
+filter { }
+
+output {
+    elasticsearch {
+        protocol => "transport"
+        host => "localhost"
+        cluster => "{{ logger_elasticsearch_cluster }}"
+    }
+}

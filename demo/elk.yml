@@ -1,0 +1,228 @@
+---
+- name: Init builder infrastructure
+  hosts: elk
+  sudo: true
+  vars:
+    # elasticsearch
+    logger_elasticsearch_url: https://download.elastic.co/elasticsearch/elasticsearch/
+    logger_elasticsearch_version: 1.5.2
+    logger_elasticsearch_init: /etc/init.d/elasticsearch
+    logger_elasticsearch_config_file: /etc/elasticsearch/elasticsearch.yml
+    logger_elasticsearch_logging_file: /etc/elasticsearch/logging.yml
+    logger_elasticsearch_cluster: "logstash"
+  
+    # logstash
+    logger_logstash_url: https://download.elastic.co/logstash/logstash/packages/debian/
+    logger_logstash_version: 1.5.0-1_all
+    logger_logstash_init: /etc/init.d/logstash
+    logger_logstash_config_dir: /etc/logstash/
+    logger_logstash_config_file: "{{ logger_logstash_config_dir }}conf.d/logstash.conf"
+    logger_logstash_kibana_dir: /opt/logstash/vendor/kibana/
+    logger_logstash_kibana_authfile: /etc/nginx/.htpasswd
+    logger_logstash_json_udp_port: 10000
+    logger_logstash_jsonlines_udp_port: 10001
+  
+    # kibana
+    logger_kibana_url: https://download.elastic.co/kibana/kibana/
+    logger_kibana_version: 4.0.2-linux-x64
+    logger_kibana_dir: /opt/kibana/
+    logger_kibana_init_dir: /etc/init.d/
+    logger_kibana_auth_username: demo
+    logger_kibana_auth_password: demo
+  
+  tasks:
+    # --- basic settings ------------------------------------------------------
+  
+    - name: Add Java 8 repository
+      apt_repository: repo='ppa:webupd8team/java'
+  
+    - name: Update apt cache
+      apt: update_cache=yes
+  
+    # via: https://coderwall.com/p/zzdapg/ansible-recipe-to-install-java-7-selecting-the-oracle-license
+    - name: Trick for non-interactive installation of Java
+      shell: echo debconf shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections
+  
+    - name: Install Java
+      apt: name=oracle-java8-installer force=yes
+  
+    - name: Install Nginx
+      apt: name=nginx
+  
+    - name: Install Ntp
+      apt: name=ntp
+  
+    - name: Install pip
+      apt: name=python-pip
+  
+    - name: Upgrade pip
+      command: pip install --upgrade pip
+  
+    - name: Install supporting library for htpasswd module
+      pip: name=passlib
+  
+    - name: Change syslog read permission
+      file: path=/var/log/syslog mode=0644
+  
+    # --- elasticsearch -------------------------------------------------------
+  
+    - name: Download Elasticsearch package
+      get_url:
+        dest: "/tmp/"
+        url: "{{ logger_elasticsearch_url }}elasticsearch-{{ logger_elasticsearch_version }}.deb"
+  
+    - name: Install Elasticsearch package
+      apt: deb=/tmp/elasticsearch-{{ logger_elasticsearch_version }}.deb
+  
+    - name: Remove downloaded Elasticsearch package
+      file:
+        path: /tmp/elasticsearch-{{ logger_elasticsearch_version }}.deb
+        state: absent
+  
+    - name: Configure Elasticsearch service start
+      command: update-rc.d elasticsearch defaults 95 10
+  
+    - name: Configure Elasticsearch
+      template:
+        src: templates/elasticsearch.yml.j2
+        dest: "{{ logger_elasticsearch_config_file }}"
+        owner: elasticsearch
+        group: elasticsearch
+        mode: 0644
+      notify: Restart Elasticsearch
+  
+    - name: Configure Elasticsearch logging
+      template:
+        src: templates/es_logging.yml.j2
+        dest: "{{ logger_elasticsearch_logging_file }}"
+        owner: elasticsearch
+        group: elasticsearch
+        mode: 0644
+      notify: Restart Elasticsearch
+  
+    # --- logstash ------------------------------------------------------------
+  
+    - name: Download Logstash package
+      get_url:
+        dest: "/tmp/"
+        url: "{{ logger_logstash_url }}logstash_{{ logger_logstash_version }}.deb"
+  
+    - name: Install Logstash package
+      apt: deb=/tmp/logstash_{{ logger_logstash_version }}.deb
+  
+    - name: Remove downloaded Logstash package
+      file:
+        path: /tmp/logstash_{{ logger_logstash_version }}.deb
+        state: absent
+  
+    - name: Copy custom patterns for Logstash
+      copy:
+        src: files/patterns
+        dest: "{{ logger_logstash_config_dir }}"
+        owner: logstash
+        group: logstash
+        mode: 0644
+  
+    - name: Configure Logstash
+      template:
+        src: templates/logstash.conf.j2
+        dest: "{{ logger_logstash_config_file }}"
+        owner: logstash
+        group: logstash
+        mode: 0644
+      notify:
+        - Restart Logstash
+  
+    # --- kibana --------------------------------------------------------------
+  
+    - name: Prepare directory for Kibana
+      file:
+        path: "{{ logger_kibana_dir }}"
+        state: directory
+  
+    - name: Download Kibana package
+      get_url:
+        dest: "/tmp/"
+        url: "{{ logger_kibana_url }}kibana-{{ logger_kibana_version }}.tar.gz"
+  
+    - name: Extract Kibana package
+      shell: tar xvf kibana-{{ logger_kibana_version }}.tar.gz
+      args:
+        chdir: /tmp
+  
+    - name: Copy Kibana content
+      shell: cp -R /tmp/kibana-4*/* {{ logger_kibana_dir }}
+  
+    - name: Remove downloaded Logstash package
+      file:
+        path: "/tmp/kibana-{{ logger_kibana_version }}.tar.gz"
+        state: absent
+  
+    - name: Copy Kibana4 startup script
+      copy:
+        src: files/kibana4
+        dest: "{{ logger_kibana_init_dir }}"
+        owner: root
+        group: root
+        mode: 0755
+      notify: Restart Kibana
+  
+    - name: Configure Kibana
+      lineinfile:
+        dest: "{{ logger_kibana_dir }}config/kibana.yml"
+        line: "host: \"localhost\""
+        regexp: "^host:"
+        state: present
+  
+    - name: Configure Kibana service start
+      command: update-rc.d kibana4 defaults 96 9
+  
+    # --- nginx ---------------------------------------------------------------
+  
+    - name: Remove Nginx default site config
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+  
+    - name: Set Nginx HTTP auth file
+      htpasswd:
+        path: "{{ logger_logstash_kibana_authfile }}"
+        name: "{{ logger_kibana_auth_username }}"
+        password: "{{ logger_kibana_auth_password }}"
+        owner: www-data
+        group: www-data
+        mode: 0400
+  
+    - name: Setup Nginx as lightweight Logstash Web service replacement
+      template:
+        src: templates/kibana_nginx.conf.j2
+        dest: /etc/nginx/sites-enabled/kibana
+        owner: root
+        group: root
+        mode: 0644
+      notify: Restart Nginx
+  
+    - name: Put first log into our fresh ELK to make easier start on Kibana Configure an index pattern page
+      file: 
+        path: "{{ logger_logstash_config_file }}"
+        state: touch
+      notify: First log
+
+
+  # --- handlers --------------------------------------------------------------
+
+  handlers:
+    - name: Restart Logstash
+      service: name=logstash state=restarted enabled=yes
+
+    - name: Restart Elasticsearch
+      service: name=elasticsearch state=restarted enabled=yes
+
+    - name: Restart Kibana
+      service: name=kibana4 state=restarted enabled=yes
+
+    - name: Restart Nginx
+      service: name=nginx state=restarted
+
+    - name: First log
+      raw: sleep 15 && logger "Tkalci na webu rulezzz..."

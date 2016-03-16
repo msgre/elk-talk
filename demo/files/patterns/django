@@ -1,0 +1,3 @@
+DJANGO_DATESTAMP %{YEAR}-%{MONTHNUM}-%{MONTHDAY} %{TIME}
+DJANGO_LOGGER [._a-zA-Z0-9]+
+DJANGO \[django\] %{DJANGO_DATESTAMP:timestamp} \[%{LOGLEVEL:loglevel}\] %{DJANGO_LOGGER:logger}:\s+%{DATA:logmessage} @ %{DATA:path}:%{INT:lineno}

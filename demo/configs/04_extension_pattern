@@ -1,0 +1,2 @@
+EXTENSION \.[0-9a-zA-Z]+
+EXTENSION_PATH .+%{EXTENSION:extension}
