@@ -5,3 +5,5 @@ about ELK stack.
 In directory [`talk`](talk/) you will find slides for my public lecture. In
 [`demo`](demo/) folder are complete installation instruction for launching
 ELK stack in your environment.
+
+![Intro screen of my talk about ELK stack](img/talk.png "Intro screen of my talk about ELK stack")
