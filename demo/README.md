@@ -66,7 +66,7 @@ please.
 
 # Modifications
 
-During my [talk](https://youtube.com) I tweak configuration of Logstash several times to
+During my [talk](../talk) I tweak configuration of Logstash several times to
 gradually present key features.
 
 You will find those modification scripts in `/configs` directory inside VirtualBox
